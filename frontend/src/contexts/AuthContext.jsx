@@ -9,51 +9,66 @@ export const AuthProvider = ({ children }) => {
 
     // Restore session from localStorage on mount
     useEffect(() => {
-        const token = localStorage.getItem("authToken");
-        const storedUserId = localStorage.getItem("userId");
-        const storedUserName = localStorage.getItem("userName");
-        const storedUserRole = localStorage.getItem("userRole");
+        const restoreSession = async () => {
+            const token = localStorage.getItem("authToken");
 
-        if (token && storedUserName && storedUserRole) {
-            setIsAuthenticated(true);
-            setUser({
-                id: storedUserId || `user_${Date.now()}`,
-                name: storedUserName,
-                role: storedUserRole
-            });
-            console.log("✅ Session restored:", { name: storedUserName, role: storedUserRole });
-        }
+            if (token) {
+                try {
+                    // Verify token with backend
+                    const response = await fetch('http://localhost:5000/api/auth/profile', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
 
-        // Mark loading as complete
-        setIsLoading(false);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setIsAuthenticated(true);
+                        setUser({
+                            id: data.user.id,
+                            name: data.user.fullName,
+                            role: data.user.role,
+                            email: data.user.email
+                        });
+                        console.log("✅ Session restored:", data.user);
+                    } else {
+                        // Token invalid, clear storage
+                        localStorage.removeItem("authToken");
+                    }
+                } catch (error) {
+                    console.error("Session restore failed:", error);
+                    localStorage.removeItem("authToken");
+                }
+            }
+
+            // Mark loading as complete
+            setIsLoading(false);
+        };
+
+        restoreSession();
     }, []);
 
-    const login = (userName, role = "victim") => {
-        // Mock login - in production, this would make an API call
-        const mockToken = `token_${Date.now()}`;
-        const mockUserId = `user_${Date.now()}`;
+    const login = (token, user) => {
+        console.log("🔐 Login with backend token:", { user });
 
-        console.log("🔐 Frontend-only login (demo):", { userName, role, userId: mockUserId });
-
-        // Store in localStorage
-        localStorage.setItem("authToken", mockToken);
-        localStorage.setItem("userId", mockUserId);
-        localStorage.setItem("userName", userName);
-        localStorage.setItem("userRole", role);
+        // Store token
+        localStorage.setItem("authToken", token);
 
         // Update state
         setIsAuthenticated(true);
-        setUser({ id: mockUserId, name: userName, role });
+        setUser({
+            id: user.id,
+            name: user.fullName,
+            role: user.role,
+            email: user.email
+        });
     };
 
     const logout = () => {
-        console.log("🚪 Frontend-only logout (demo)");
+        console.log("🚪 Logout");
 
-        // Clear localStorage
+        // Clear token
         localStorage.removeItem("authToken");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("userName");
-        localStorage.removeItem("userRole");
 
         // Update state
         setIsAuthenticated(false);

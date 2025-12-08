@@ -28,10 +28,45 @@ import { useToast } from "@/hooks/use-toast";
 import LegalPopCard from "@/components/LegalPopCard";
 import VictimSupportFaqContent from "@/components/VictimSupportFaqContent";
 import FileUpload from "@/components/FileUpload";
+import { grievanceAPI, documentAPI } from "@/services/api";
 
 const VictimPortal = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("register");
+
+  // Form data state
+  const [formData, setFormData] = useState({
+    aadhaarNumber: "",
+    mobileNumber: "",
+    email: "",
+    firCaseNumber: "",
+    policeStation: "",
+    district: "",
+    state: "",
+    dateOfIncident: "",
+    dateOfFirRegistration: "",
+    delayReason: "",
+    casteCategory: "",
+    casteCertificateNumber: "",
+    typeOfAtrocity: "",
+    incidentDescription: "",
+    village: "",
+    pincode: "",
+    witnessName: "",
+    witnessContact: "",
+    accountHolderName: "",
+    bankName: "",
+    accountNumber: "",
+    confirmAccountNumber: "",
+    ifscCode: ""
+  });
+
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [caseId, setCaseId] = useState("");
+  const [grievanceId, setGrievanceId] = useState("");
+
   const [incidentDate, setIncidentDate] = useState("");
   const [firDate, setFirDate] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -60,42 +95,131 @@ const VictimPortal = () => {
   const officerTransactionId = "TXN123456789";
 
   // Officer Queries State
-  const [officerQueries, setOfficerQueries] = useState([
-    {
-      id: 1,
-      type: "Missing document",
-      message: "Please upload a clear scan of your Caste Certificate.",
-      status: "Action Required", // "Action Required", "Waiting for Officer Review", "Resolved"
-      raisedOn: "24 Nov 2025",
-    },
-    {
-      id: 2,
-      type: "Clarification on incident",
-      message: "Please clarify the exact time of incident.",
-      status: "Resolved",
-      raisedOn: "20 Nov 2025",
-    },
-  ]);
+  const [officerQueries, setOfficerQueries] = useState([]);
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState(null);
   const [responseText, setResponseText] = useState("");
   const [responseFile, setResponseFile] = useState(null);
   const [responseError, setResponseError] = useState("");
 
+  // Track Status State
+  const [trackCaseId, setTrackCaseId] = useState("");
+  const [trackedCase, setTrackedCase] = useState(null);
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackError, setTrackError] = useState("");
+  const [trackedDisbursements, setTrackedDisbursements] = useState([]);
+  const [verifyingIndex, setVerifyingIndex] = useState(-1);
+  const [verifyTxnInput, setVerifyTxnInput] = useState("");
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Collect form data from form fields
+    const form = e.target;
+    const updatedFormData = {
+      aadhaarNumber: form.aadhaar.value,
+      mobileNumber: form.mobile.value,
+      email: form.email.value || "",
+      firCaseNumber: form.fir.value,
+      policeStation: form["police-station"].value,
+      district: form.district.value,
+      state: form.state.value,
+      dateOfIncident: form["incident-date"].value,
+      dateOfFirRegistration: form["fir-date"].value || undefined,
+      delayReason: form["delay-reason"]?.value || "",
+      casteCategory: form["caste-category"].value,
+      casteCertificateNumber: form["caste-certificate"].value,
+      typeOfAtrocity: form["atrocity-type"].value,
+      incidentDescription: form["incident-description"]?.value || "",
+      village: form.village?.value || "",
+      pincode: form.pincode?.value || "",
+      witnessName: form["witness-name"]?.value || "",
+      witnessContact: form["witness-contact"]?.value || "",
+      accountHolderName: form["account-holder-name"].value,
+      bankName: form["bank-name"]?.value || "",
+      accountNumber: form["account-number"].value,
+      ifscCode: form["ifsc-code"].value
+    };
+
+    setFormData(updatedFormData);
     setShowReviewModal(true);
   };
 
-  const handleConfirmSubmit = () => {
-    console.log("Form submitted");
-    const dummyCaseId = `DBT-2024-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    setShowReviewModal(false);
-    toast({
-      title: "Application Submitted Successfully! ✓",
-      description: `Your case has been registered. Your Case ID is: #${dummyCaseId}`,
-    });
+  const handleConfirmSubmit = async () => {
+    setIsSubmitting(true);
+
+    try {
+      // Step 1: Create the grievance
+      const response = await grievanceAPI.create(formData);
+      const newGrievanceId = response.data.grievanceId;
+      const newCaseId = response.data.caseId;
+
+      // Step 2: Upload all documents automatically
+      const uploadPromises = [];
+
+      if (firFile) {
+        uploadPromises.push(
+          documentAPI.upload(firFile, newGrievanceId, 'fir')
+            .catch(err => console.error('FIR upload failed:', err))
+        );
+      }
+
+      if (casteFile) {
+        uploadPromises.push(
+          documentAPI.upload(casteFile, newGrievanceId, 'casteCertificate')
+            .catch(err => console.error('Caste certificate upload failed:', err))
+        );
+      }
+
+      if (medicalFile) {
+        uploadPromises.push(
+          documentAPI.upload(medicalFile, newGrievanceId, 'medicalReport')
+            .catch(err => console.error('Medical report upload failed:', err))
+        );
+      }
+
+      if (otherDocsFile) {
+        uploadPromises.push(
+          documentAPI.upload(otherDocsFile, newGrievanceId, 'other')
+            .catch(err => console.error('Other documents upload failed:', err))
+        );
+      }
+
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+
+      // Success!
+      setCaseId(newCaseId);
+      setGrievanceId(newGrievanceId);
+      setSubmissionSuccess(true);
+      setShowReviewModal(false);
+
+      toast({
+        title: "Application Submitted Successfully! ✓",
+        description: `Your case has been registered. Your Case ID is: ${newCaseId}`,
+      });
+
+    } catch (error) {
+      console.error("Submission error:", error);
+
+      // Handle duplicate FIR error
+      if (error.response?.data?.message?.includes("FIR number already exists")) {
+        toast({
+          title: "Duplicate FIR Number",
+          description: `This FIR number is already registered. Existing Case ID: ${error.response.data.existingCaseId}`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: error.response?.data?.message || "Failed to submit grievance. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleVerifyUTR = () => {
@@ -157,11 +281,14 @@ const VictimPortal = () => {
     }
   };
 
-  const handleSubmitResponse = () => {
+  const handleSubmitResponse = async () => {
+    const isMissingDocument = selectedQuery.type?.toLowerCase().includes("missing");
+
     // Validation
-    if (selectedQuery.type === "Missing document") {
-      if (!responseFile) {
-        setResponseError("Please upload the required document");
+    if (isMissingDocument) {
+      // For missing document, require at least file OR text
+      if (!responseFile && !responseText.trim()) {
+        setResponseError("Please upload a document or provide a text response");
         return;
       }
     } else {
@@ -171,27 +298,62 @@ const VictimPortal = () => {
       }
     }
 
-    // Update query status
-    setOfficerQueries(queries =>
-      queries.map(q =>
-        q.id === selectedQuery.id
-          ? { ...q, status: "Waiting for Officer Review" }
-          : q
-      )
-    );
+    try {
+      let uploadedFileName = null;
 
-    // Close modal
-    handleCloseResponseModal();
+      // Upload file if provided
+      if (responseFile && trackedCase?._id) {
+        try {
+          const uploadResult = await documentAPI.upload(responseFile, trackedCase._id, 'queryResponse');
+          uploadedFileName = responseFile.name;
+          toast({
+            title: "Document Uploaded",
+            description: `${responseFile.name} uploaded successfully.`,
+          });
+        } catch (uploadErr) {
+          console.error('File upload error:', uploadErr);
+          // Continue even if upload fails, just note it in response
+          uploadedFileName = `${responseFile.name} (upload pending)`;
+        }
+      }
 
-    // Show success toast
-    toast({
-      title: "Response Submitted",
-      description: "Your response has been submitted. The officer will review it shortly.",
-    });
+      // Build response text
+      let finalResponse = responseText.trim();
+      if (uploadedFileName) {
+        finalResponse = finalResponse
+          ? `${finalResponse}\n\n[Document uploaded: ${uploadedFileName}]`
+          : `Document uploaded: ${uploadedFileName}`;
+      }
+
+      await grievanceAPI.respondToQuery(trackedCase._id, selectedQuery.id, {
+        response: finalResponse
+      });
+
+      // Refresh tracked case data
+      handleTrackCase();
+
+      // Close modal
+      handleCloseResponseModal();
+
+      // Show success toast
+      toast({
+        title: "Response Submitted",
+        description: "Your response has been submitted. The officer will review it shortly.",
+      });
+    } catch (err) {
+      console.error('Error submitting response:', err);
+      toast({
+        title: "Error",
+        description: "Failed to submit response. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Helper to get query status message
   const getQueryStatusMessage = () => {
+    if (!officerQueries.length) return null;
+
     const hasActionRequired = officerQueries.some(q => q.status === "Action Required");
     const allResolved = officerQueries.every(q => q.status === "Resolved");
     const allWaiting = officerQueries.every(q => q.status === "Waiting for Officer Review" || q.status === "Resolved");
@@ -206,38 +368,138 @@ const VictimPortal = () => {
     return null;
   };
 
+  // Track case handler
+  const handleTrackCase = async () => {
+    if (!trackCaseId.trim()) {
+      setTrackError("Please enter a Case ID or Aadhaar number");
+      return;
+    }
 
+    setTrackLoading(true);
+    setTrackError("");
 
+    try {
+      const response = await grievanceAPI.trackByCaseId(trackCaseId.trim());
+      setTrackedCase(response.data);
+      setOfficerQueries(response.data.queries || []);
+      setTrackedDisbursements(response.data.disbursements || []);
+      setTrackError("");
+    } catch (err) {
+      console.error('Error tracking case:', err);
+      setTrackError(err.response?.data?.message || "Case not found. Please check your Case ID.");
+      setTrackedCase(null);
+      setOfficerQueries([]);
+      setTrackedDisbursements([]);
+    } finally {
+      setTrackLoading(false);
+    }
+  };
 
-  const caseStages = [
-    { stage: "Application Filed", status: "completed", date: "2024-01-15" },
-    { stage: "Document Verification", status: "completed", date: "2024-01-16" },
-    {
-      stage: "Officer Review",
-      status: officerQueries.every(q => q.status === "Resolved") ? "completed" : "in-progress",
-      date: officerQueries.every(q => q.status === "Resolved") ? "2024-01-17" : "In Progress"
-    },
-    {
-      stage: "Relief Sanctioned",
-      status: officerQueries.every(q => q.status === "Resolved") ? "completed" : "pending",
-      date: officerQueries.every(q => q.status === "Resolved") ? "2024-01-18" : "Pending"
-    },
-    {
-      stage: "DBT to Bank Account",
-      status: officerQueries.every(q => q.status === "Resolved") ? "completed" : "pending",
-      date: officerQueries.every(q => q.status === "Resolved") ? "2024-01-19" : "Pending"
-    },
-    {
-      stage: "Victim Confirmation",
-      status: officerQueries.every(q => q.status === "Resolved") ? (isVerified ? "completed" : "in-progress") : "pending",
-      date: officerQueries.every(q => q.status === "Resolved") ? (isVerified ? new Date().toISOString().split('T')[0] : "Awaiting Confirmation") : "Pending"
-    },
-    {
-      stage: "Case Closed",
-      status: isVerified ? "completed" : "pending",
-      date: isVerified ? new Date().toISOString().split('T')[0] : "Pending"
-    },
-  ];
+  // Verify transaction handler
+  const handleVerifyDisbursement = async (index) => {
+    if (!verifyTxnInput.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter the transaction ID",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await grievanceAPI.verifyTransaction(trackedCase._id, index, verifyTxnInput.trim());
+
+      // Refresh tracked case
+      handleTrackCase();
+
+      setVerifyingIndex(-1);
+      setVerifyTxnInput("");
+
+      toast({
+        title: response.data?.allVerified ? "All Verified!" : "Verified",
+        description: response.message,
+      });
+    } catch (err) {
+      console.error('Error verifying:', err);
+      toast({
+        title: "Verification Failed",
+        description: err.response?.data?.message || "Transaction ID does not match.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Generate dynamic case stages based on tracked case
+  const getCaseStages = () => {
+    if (!trackedCase) {
+      // Default demo stages when no case is tracked
+      return [
+        { stage: "Application Filed", status: "completed", date: "2024-01-15" },
+        { stage: "Document Verification", status: "completed", date: "2024-01-16" },
+        { stage: "Officer Review", status: "in-progress", date: "In Progress" },
+        { stage: "Relief Sanctioned", status: "pending", date: "Pending" },
+        { stage: "DBT to Bank Account", status: "pending", date: "Pending" },
+        { stage: "Victim Confirmation", status: "pending", date: "Pending" },
+        { stage: "Case Closed", status: "pending", date: "Pending" },
+      ];
+    }
+
+    const status = trackedCase.status;
+    const hasQueries = officerQueries.length > 0;
+    const allQueriesResolved = officerQueries.every(q => q.status === "Resolved");
+    const hasDisbursements = trackedDisbursements.length > 0;
+    const allDisbursementsVerified = trackedDisbursements.length > 0 &&
+      trackedDisbursements.every(d => d.victimVerified);
+    const isApprovedOrBeyond = ['approved', 'disbursed', 'closed'].includes(status);
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return "Pending";
+      return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    return [
+      {
+        stage: "Application Filed",
+        status: "completed",
+        date: formatDate(trackedCase.submittedAt)
+      },
+      {
+        stage: "Document Verification",
+        status: status !== 'pending' ? "completed" : "in-progress",
+        date: status !== 'pending' ? formatDate(trackedCase.lastUpdated) : "In Progress"
+      },
+      {
+        stage: "Officer Review",
+        status: isApprovedOrBeyond ? "completed" :
+          (status === 'under_review' ? "in-progress" : "pending"),
+        date: isApprovedOrBeyond ? formatDate(trackedCase.lastUpdated) :
+          (status === 'under_review' ? "In Progress" : "Pending")
+      },
+      {
+        stage: "Relief Sanctioned",
+        status: isApprovedOrBeyond ? "completed" : "pending",
+        date: isApprovedOrBeyond ? formatDate(trackedCase.lastUpdated) : "Pending"
+      },
+      {
+        stage: "DBT to Bank Account",
+        status: hasDisbursements ? (allDisbursementsVerified ? "completed" : "in-progress") : "pending",
+        date: hasDisbursements ? formatDate(trackedDisbursements[0]?.disbursedAt) : "Pending"
+      },
+      {
+        stage: "Victim Confirmation",
+        status: allDisbursementsVerified ? "completed" : (hasDisbursements ? "in-progress" : "pending"),
+        date: allDisbursementsVerified ? formatDate(trackedDisbursements[trackedDisbursements.length - 1]?.victimVerifiedAt) :
+          (hasDisbursements ? "Awaiting Verification" : "Pending")
+      },
+      {
+        stage: "Case Closed",
+        status: status === 'closed' ? "completed" : "pending",
+        date: status === 'closed' ? formatDate(trackedCase.lastUpdated) : "Pending"
+      },
+    ];
+  };
+
+  const caseStages = getCaseStages();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -852,15 +1114,15 @@ const VictimPortal = () => {
                               <div className="grid md:grid-cols-2 gap-3 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Aadhaar Number</p>
-                                  <p className="font-medium">XXXX-XXXX-1234</p>
+                                  <p className="font-medium">{formData.aadhaarNumber || "Not provided"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Mobile Number</p>
-                                  <p className="font-medium">+91 XXXXX-67890</p>
+                                  <p className="font-medium">{formData.mobileNumber || "Not provided"}</p>
                                 </div>
-                                <div>
-                                  <p className="text-muted-foreground">Preferred Language</p>
-                                  <p className="font-medium">English</p>
+                                <div className="md:col-span-2">
+                                  <p className="text-muted-foreground">Email Address</p>
+                                  <p className="font-medium">{formData.email || "Not provided"}</p>
                                 </div>
                               </div>
                             </div>
@@ -873,28 +1135,28 @@ const VictimPortal = () => {
                               </h3>
                               <div className="grid md:grid-cols-2 gap-3 text-sm">
                                 <div>
-                                  <p className="text-muted-foreground">FIR/Case Number</p>
-                                  <p className="font-medium">FIR-2024-XXXX</p>
+                                  <p className="text-muted-foreground">FIR Case Number</p>
+                                  <p className="font-medium">{formData.firCaseNumber || "Not provided"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Police Station</p>
-                                  <p className="font-medium">Example PS</p>
+                                  <p className="font-medium">{formData.policeStation || "Not provided"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">District</p>
-                                  <p className="font-medium">Example District</p>
+                                  <p className="font-medium">{formData.district || "Not specified"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">State</p>
-                                  <p className="font-medium">Maharashtra</p>
+                                  <p className="font-medium">{formData.state || "Not specified"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Date of Incident</p>
-                                  <p className="font-medium">{incidentDate || "Not specified"}</p>
+                                  <p className="font-medium">{formData.dateOfIncident || "Not specified"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Date of FIR Registration</p>
-                                  <p className="font-medium">{firDate || "Not specified"}</p>
+                                  <p className="font-medium">{formData.dateOfFirRegistration || "Not specified"}</p>
                                 </div>
                               </div>
                             </div>
@@ -944,17 +1206,21 @@ const VictimPortal = () => {
                               <div className="grid md:grid-cols-2 gap-3 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Account Holder Name</p>
-                                  <p className="font-medium">Example Name</p>
+                                  <p className="font-medium">{formData.accountHolderName || "Not provided"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Bank Name</p>
+                                  <p className="font-medium">{formData.bankName || "Not provided"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Account Number</p>
                                   <p className="font-medium">
-                                    XXXXXXX{accountNumber.slice(-4) || "XXXX"}
+                                    {formData.accountNumber ? `XXXXXXX${formData.accountNumber.slice(-4)}` : "Not provided"}
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">IFSC Code</p>
-                                  <p className="font-medium">XXXX0000XXX</p>
+                                  <p className="font-medium">{formData.ifscCode || "Not provided"}</p>
                                 </div>
                               </div>
                             </div>
@@ -983,6 +1249,7 @@ const VictimPortal = () => {
                               variant="outline"
                               className="flex-1"
                               onClick={() => setShowReviewModal(false)}
+                              disabled={isSubmitting}
                             >
                               Edit Details
                             </Button>
@@ -990,11 +1257,44 @@ const VictimPortal = () => {
                               type="button"
                               className="flex-1 bg-accent hover:bg-accent-hover"
                               onClick={handleConfirmSubmit}
+                              disabled={isSubmitting}
                             >
-                              Confirm & Submit
+                              {isSubmitting ? "Submitting..." : "Confirm & Submit"}
                             </Button>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Success Message */}
+                    {submissionSuccess && caseId && (
+                      <div className="space-y-6 mt-8">
+                        {/* Success Card */}
+                        <Card className="p-6 bg-green-50 border-green-200">
+                          <div className="flex items-start gap-4">
+                            <CheckCircle2 className="h-12 w-12 text-green-600 flex-shrink-0" />
+                            <div className="flex-1">
+                              <h3 className="text-2xl font-bold text-green-900 mb-2">
+                                Application Submitted Successfully! ✓
+                              </h3>
+                              <div className="space-y-2">
+                                <p className="text-green-800">
+                                  Your case has been registered in the NyayaSetu system and all documents have been uploaded.
+                                </p>
+                                <div className="bg-white rounded-lg p-4 border border-green-300">
+                                  <p className="text-sm text-muted-foreground mb-1">Your Case ID:</p>
+                                  <p className="text-2xl font-bold text-green-900">{caseId}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Save this Case ID for tracking your application status
+                                  </p>
+                                </div>
+                                <p className="text-sm text-green-800 mt-3">
+                                  📧 A confirmation email has been sent to your registered email address with your case details.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
                       </div>
                     )}
                   </div>
@@ -1013,23 +1313,43 @@ const VictimPortal = () => {
                     </div>
 
                     <div className="flex gap-4">
-                      <Input placeholder="Enter Case ID or Aadhaar" className="flex-1" />
-                      <Button className="bg-primary hover:bg-primary-hover">
+                      <Input
+                        placeholder="Enter Case ID or Aadhaar"
+                        className="flex-1"
+                        value={trackCaseId}
+                        onChange={(e) => setTrackCaseId(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleTrackCase()}
+                      />
+                      <Button
+                        className="bg-primary hover:bg-primary-hover"
+                        onClick={handleTrackCase}
+                        disabled={trackLoading}
+                      >
                         <Eye className="mr-2 h-4 w-4" />
-                        Track
+                        {trackLoading ? "Tracking..." : "Track"}
                       </Button>
                     </div>
 
-                    {/* Sample Status Display */}
+                    {trackError && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                        {trackError}
+                      </div>
+                    )}
+
+                    {/* Status Display */}
                     <div className="space-y-6 pt-6">
                       <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                         <div>
                           <p className="text-sm text-muted-foreground">Case ID</p>
-                          <p className="font-bold text-lg">DBT-2024-MH-00123</p>
+                          <p className="font-bold text-lg">{trackedCase?.caseId || "DBT-2024-XX-XXXXX"}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm text-muted-foreground">Applied On</p>
-                          <p className="font-semibold">15 Jan 2024</p>
+                          <p className="font-semibold">
+                            {trackedCase?.submittedAt
+                              ? new Date(trackedCase.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                              : "-- --- ----"}
+                          </p>
                         </div>
                       </div>
 
@@ -1124,45 +1444,106 @@ const VictimPortal = () => {
                                 </div>
                               )}
 
-                              {/* UTR Verification Card - Show under Victim Confirmation step */}
-                              {stage.stage === "Victim Confirmation" && stage.status === "in-progress" && !isVerified && (
-                                <div className="mt-4 bg-accent/5 border border-accent/20 rounded-lg p-4 space-y-3">
-                                  <p className="font-medium text-sm">Verify Transaction / UTR ID</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    After you receive the amount in your bank account, enter the Transaction/UTR ID mentioned in the SMS from your bank to confirm receipt.
-                                  </p>
-                                  <div className="space-y-2">
-                                    <Input
-                                      placeholder="Enter Transaction / UTR ID"
-                                      value={utrId}
-                                      onChange={(e) => {
-                                        setUtrId(e.target.value);
-                                        setVerificationError("");
-                                      }}
-                                      className={verificationError ? "border-red-500" : ""}
-                                    />
-                                    {verificationError && (
-                                      <p className="text-xs text-red-500">{verificationError}</p>
-                                    )}
-                                    <Button
-                                      onClick={handleVerifyUTR}
-                                      className="w-full bg-primary hover:bg-primary-hover"
-                                      disabled={!utrId.trim()}
-                                    >
-                                      Verify Receipt
-                                    </Button>
+                              {/* Transaction Verification Card - Show under Victim Confirmation step */}
+                              {stage.stage === "Victim Confirmation" && stage.status === "in-progress" && trackedDisbursements.length > 0 && (
+                                <div className="mt-4 bg-accent/5 border border-accent/20 rounded-lg p-4 space-y-4">
+                                  <div>
+                                    <p className="font-medium text-sm">Verify Your Disbursements</p>
                                     <p className="text-xs text-muted-foreground">
-                                      Hint: Use <code className="bg-muted px-1 py-0.5 rounded text-xs">TXN123456789</code> for this demo
+                                      Verify each transaction by entering the Transaction ID from your bank SMS.
                                     </p>
+                                  </div>
+
+                                  {trackedDisbursements.map((disbursement, idx) => (
+                                    <div key={idx} className="border border-muted rounded-lg p-3 bg-background">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div>
+                                          <span className="font-medium text-sm">
+                                            Phase {idx + 1} ({disbursement.percentage}%)
+                                          </span>
+                                          {disbursement.amount && (
+                                            <span className="text-sm text-muted-foreground ml-2">
+                                              ₹{disbursement.amount?.toLocaleString()}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {disbursement.victimVerified ? (
+                                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                            ✓ Verified
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                                            Pending
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {!disbursement.victimVerified && (
+                                        verifyingIndex === idx ? (
+                                          <div className="space-y-2">
+                                            <Input
+                                              placeholder="Enter Transaction ID from bank SMS"
+                                              value={verifyTxnInput}
+                                              onChange={(e) => setVerifyTxnInput(e.target.value)}
+                                              className="text-sm"
+                                            />
+                                            <div className="flex gap-2">
+                                              <Button
+                                                size="sm"
+                                                onClick={() => handleVerifyDisbursement(idx)}
+                                                className="bg-primary hover:bg-primary-hover"
+                                              >
+                                                Verify
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setVerifyingIndex(-1);
+                                                  setVerifyTxnInput("");
+                                                }}
+                                              >
+                                                Cancel
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setVerifyingIndex(idx)}
+                                            className="w-full"
+                                          >
+                                            Enter Transaction ID
+                                          </Button>
+                                        )
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {/* Grievance option if money not received */}
+                                  <div className="border-t pt-3">
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      Haven't received the money? You can raise a grievance.
+                                    </p>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                                      onClick={() => window.location.href = '/grievances'}
+                                    >
+                                      <AlertCircle className="mr-2 h-3 w-3" />
+                                      Raise Grievance
+                                    </Button>
                                   </div>
                                 </div>
                               )}
 
-                              {/* Success Message - Show when verified */}
-                              {stage.stage === "Victim Confirmation" && isVerified && (
+                              {/* Success Message - Show when all verified */}
+                              {stage.stage === "Victim Confirmation" && stage.status === "completed" && (
                                 <div className="mt-4 bg-secondary/5 border border-secondary/20 rounded-lg p-4 space-y-2">
                                   <p className="text-sm font-medium text-secondary">
-                                    ✅ Relief amount received and verified
+                                    ✅ All disbursements received and verified
                                   </p>
                                   <p className="text-xs text-muted-foreground">
                                     Thank you. Your case is now closed.
@@ -1372,7 +1753,7 @@ const VictimPortal = () => {
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Case ID</p>
-                  <p className="font-semibold">DBT-2024-MH-00123</p>
+                  <p className="font-semibold">{trackedCase?.caseId || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Query Type</p>
@@ -1385,24 +1766,50 @@ const VictimPortal = () => {
               </div>
 
               {/* Conditional Response Input */}
-              {selectedQuery.type === "Missing document" ? (
-                <div className="space-y-2">
-                  <label htmlFor="response-file" className="text-sm font-medium">
-                    Upload required document <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    id="response-file"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleResponseFileChange}
-                  />
-                  <p className="text-xs text-muted-foreground">PDF/JPG/PNG, Max 5MB</p>
-                  {responseFile && (
-                    <p className="text-xs text-green-600">✓ {responseFile.name}</p>
-                  )}
+              {selectedQuery.type?.toLowerCase().includes("missing") ? (
+                <div className="space-y-4">
+                  {/* File Upload Section */}
+                  <div className="space-y-2">
+                    <label htmlFor="response-file" className="text-sm font-medium">
+                      Upload required document <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <Input
+                      id="response-file"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleResponseFileChange}
+                    />
+                    <p className="text-xs text-muted-foreground">PDF/JPG/PNG, Max 5MB</p>
+                    {responseFile && (
+                      <p className="text-xs text-green-600">✓ {responseFile.name}</p>
+                    )}
+                  </div>
+
+                  {/* Text Response Section */}
+                  <div className="space-y-2">
+                    <label htmlFor="response-text" className="text-sm font-medium">
+                      Additional notes <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <textarea
+                      id="response-text"
+                      rows={3}
+                      className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                      placeholder="Add any clarification or notes about the uploaded document."
+                      value={responseText}
+                      onChange={(e) => {
+                        setResponseText(e.target.value);
+                        setResponseError("");
+                      }}
+                    />
+                  </div>
+
                   {responseError && (
                     <p className="text-xs text-red-500">{responseError}</p>
                   )}
+
+                  <p className="text-xs text-muted-foreground">
+                    Please upload a document OR provide a text response (at least one is required).
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">

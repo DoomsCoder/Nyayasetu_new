@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { grievanceAPI, ticketAPI } from "@/services/api";
+import DocumentViewer from "@/components/DocumentViewer";
+import { useToast } from "@/hooks/use-toast";
 import {
   Shield,
   FileCheck,
@@ -27,12 +30,22 @@ import {
   Verified,
   Upload,
   X,
+  CreditCard,
+  Ticket,
+  Send,
 } from "lucide-react";
 
 const OfficerPortal = () => {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  // API Integration State
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all"); // all, pending, approved, rejected
+  const [error, setError] = useState("");
 
   // Raise Query Modal State
   const [showQueryModal, setShowQueryModal] = useState(false);
@@ -46,34 +59,107 @@ const OfficerPortal = () => {
   // Transaction/Disbursement Modal State
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [disbursementCase, setDisbursementCase] = useState(null);
-  const [transactionId, setTransactionId] = useState("");
+  const [transactionId1, setTransactionId1] = useState(""); // 25%
+  const [transactionId2, setTransactionId2] = useState(""); // 25%
+  const [transactionId3, setTransactionId3] = useState(""); // 50%
   const [transactionError, setTransactionError] = useState("");
 
-  // Officer Queries & Victim Responses State
-  const [officerQueriesForCase, setOfficerQueriesForCase] = useState([
-    {
-      id: 1,
-      type: "Missing Document",
-      message: "Please upload a clear scan of your Caste Certificate.",
-      status: "Waiting for Officer Review",
-      raisedOn: "24 Nov 2025",
-      response: {
-        type: "document",
-        fileName: "caste_certificate.pdf"
-      }
-    },
-    {
-      id: 2,
-      type: "Clarification on incident",
-      message: "Please clarify the exact time of incident.",
-      status: "Resolved",
-      raisedOn: "20 Nov 2025",
-      response: {
-        type: "text",
-        content: "The incident happened at 8:30 PM near the market road."
-      }
+  // Support Tickets State (new - API connected)
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [ticketSearchQuery, setTicketSearchQuery] = useState("");
+  const [ticketResponse, setTicketResponse] = useState("");
+  const [ticketResponseLoading, setTicketResponseLoading] = useState(false);
+
+  // Fetch cases from API
+  useEffect(() => {
+    fetchCases();
+  }, [statusFilter]);
+
+  const fetchCases = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const filters = statusFilter !== "all" ? { status: statusFilter } : {};
+      const response = await grievanceAPI.getAll(filters);
+      setCases(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch cases:", error);
+      setError("Failed to load cases. Please try again.");
+      setCases([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  // Filter cases based on search query
+  const filteredCases = cases.filter(caseItem => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const caseId = (caseItem.caseId || "").toLowerCase();
+    const firNumber = (caseItem.firCaseNumber || "").toLowerCase();
+    const district = (caseItem.district || "").toLowerCase();
+    const state = (caseItem.state || "").toLowerCase();
+
+    return caseId.includes(query) ||
+      firNumber.includes(query) ||
+      district.includes(query) ||
+      state.includes(query);
+  });
+
+  // Export all cases to CSV
+  const handleExport = async () => {
+    try {
+      // Fetch ALL cases (without filters)
+      const response = await grievanceAPI.getAll({});
+      const allCases = response.data || [];
+
+      if (allCases.length === 0) {
+        alert("No cases to export");
+        return;
+      }
+
+      // Create CSV content
+      const headers = ["Case ID", "FIR Number", "District", "State", "Status", "Submitted Date"];
+      const csvRows = [headers.join(",")];
+
+      allCases.forEach(caseItem => {
+        const row = [
+          caseItem.caseId || caseItem._id || "",
+          caseItem.firCaseNumber || "",
+          caseItem.district || "",
+          caseItem.state || "",
+          caseItem.status || "",
+          caseItem.submittedAt ? new Date(caseItem.submittedAt).toLocaleDateString() : ""
+        ];
+        csvRows.push(row.join(","));
+      });
+
+      // Create blob and download
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `cases_report_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log(`Exported ${allCases.length} cases`);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to export cases. Please try again.");
+    }
+  };
+
+  // Officer Queries & Victim Responses State
+  // Queries state - populated from real case data when View Details is clicked
+  const [officerQueriesForCase, setOfficerQueriesForCase] = useState([]);
 
   // Grievances State
   const [grievances, setGrievances] = useState([
@@ -177,6 +263,7 @@ const OfficerPortal = () => {
       documents: [
         { type: "FIR Copy", status: "verified" },
         { type: "Medical Report", status: "verified" },
+        { type: "Caste Certificate", status: "verified" },
         { type: "Other Supporting Documents", status: "pending" },
       ],
     },
@@ -205,6 +292,7 @@ const OfficerPortal = () => {
       documents: [
         { type: "FIR Copy", status: "verified" },
         { type: "Medical Report", status: "not_applicable" },
+        { type: "Caste Certificate", status: "verified" },
         { type: "Other Supporting Documents", status: "verified" },
       ],
     },
@@ -233,6 +321,7 @@ const OfficerPortal = () => {
       documents: [
         { type: "FIR Copy", status: "verified" },
         { type: "Medical Report", status: "not_applicable" },
+        { type: "Caste Certificate", status: "verified" },
         { type: "Other Supporting Documents", status: "verified" },
       ],
     },
@@ -261,6 +350,25 @@ const OfficerPortal = () => {
   // Event handlers for View Details modal
   const handleViewDetails = (caseItem) => {
     setSelectedCase(caseItem);
+    // Load real queries from the case, not mock data
+    if (caseItem.queries && caseItem.queries.length > 0) {
+      setOfficerQueriesForCase(caseItem.queries.map((q, index) => ({
+        id: index,
+        type: q.queryType || q.type || "General Query",
+        message: q.message || "",
+        status: q.status === "resolved" ? "Resolved" : (q.response ? "Waiting for Officer Review" : "Action Required"),
+        raisedOn: q.raisedAt ? new Date(q.raisedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "N/A",
+        response: q.response ? {
+          type: q.responseFile ? "document" : "text",
+          content: q.response,
+          fileName: q.responseFile || null
+        } : null,
+        highPriority: q.highPriority || false
+      })));
+    } else {
+      // No queries for this case
+      setOfficerQueriesForCase([]);
+    }
     setShowDetailsModal(true);
   };
 
@@ -269,58 +377,134 @@ const OfficerPortal = () => {
     setSelectedCase(null);
   };
 
-  const handlePutOnHold = () => {
-    console.log("Case put on hold (demo)", selectedCase?.id);
-    handleCloseModal();
+  const handlePutOnHold = async () => {
+    if (!selectedCase) return;
+
+    console.log('handlePutOnHold - selectedCase._id:', selectedCase._id);
+    console.log('handlePutOnHold - selectedCase:', selectedCase);
+
+    try {
+      await grievanceAPI.updateStatus(selectedCase._id, { status: 'on_hold' });
+      toast({
+        title: "Status Updated",
+        description: `Case ${selectedCase.caseId} has been put on hold`,
+      });
+      setShowDetailsModal(false);
+      fetchCases(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update case status",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleReject = () => {
-    console.log("Case rejected (demo)", selectedCase?.id);
-    handleCloseModal();
+  const handleReject = async () => {
+    if (!selectedCase) return;
+
+    try {
+      await grievanceAPI.updateStatus(selectedCase._id, { status: 'rejected' });
+      toast({
+        title: "Case Rejected",
+        description: `Case ${selectedCase.caseId} has been rejected`,
+      });
+      setShowDetailsModal(false);
+      fetchCases(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject case",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleApprove = () => {
-    // Open transaction modal instead of directly approving
-    setDisbursementCase(selectedCase);
-    setShowTransactionModal(true);
-    setTransactionId("");
-    setTransactionError("");
-    handleCloseModal(); // Close View Details modal if open
+  const handleApprove = async () => {
+    if (!selectedCase) return;
+
+    try {
+      await grievanceAPI.updateStatus(selectedCase._id, { status: 'approved' });
+      toast({
+        title: "Case Approved! ✓",
+        description: `Case ${selectedCase.caseId} has been approved`,
+      });
+      setShowDetailsModal(false);
+      fetchCases(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve case",
+        variant: "destructive"
+      });
+    }
   };
 
   // Event handlers for Transaction/Disbursement modal
   const handleOpenTransactionModal = (caseItem) => {
     setDisbursementCase(caseItem);
     setShowTransactionModal(true);
-    setTransactionId("");
+    setTransactionId1("");
+    setTransactionId2("");
+    setTransactionId3("");
     setTransactionError("");
   };
 
   const handleCloseTransactionModal = () => {
     setShowTransactionModal(false);
     setDisbursementCase(null);
-    setTransactionId("");
+    setTransactionId1("");
+    setTransactionId2("");
+    setTransactionId3("");
     setTransactionError("");
   };
 
-  const handleSaveDisbursement = () => {
-    // Validation
-    if (!transactionId.trim()) {
-      setTransactionError("Transaction/UTR ID is required.");
+  // Save single phase disbursement
+  const handleSaveSingleDisbursement = async (phaseIndex, transactionId) => {
+    if (!transactionId?.trim()) {
+      setTransactionError(`Transaction ID for Phase ${phaseIndex + 1} is required.`);
       return;
     }
 
-    // Log transaction data
-    console.log("Transaction saved (demo)", {
-      caseId: disbursementCase?.id,
-      transactionId: transactionId.trim(),
-    });
+    try {
+      const response = await grievanceAPI.saveDisbursements(disbursementCase?._id, {
+        transactionId: transactionId.trim(),
+        phase: phaseIndex,
+        approvedAmount: disbursementCase?.approvedAmount
+      });
 
-    // Close modal
-    handleCloseTransactionModal();
+      // Show success toast
+      toast({
+        title: response.message || "Disbursement Saved",
+        description: `Phase ${phaseIndex + 1} transaction saved. Awaiting victim verification.`,
+        variant: "default"
+      });
 
-    // Show confirmation
-    alert("Transaction ID saved. Case marked as disbursed (demo).");
+      // Refresh cases list
+      fetchCases();
+
+      // Clear the input field
+      if (phaseIndex === 0) setTransactionId1("");
+      if (phaseIndex === 1) setTransactionId2("");
+      if (phaseIndex === 2) setTransactionId3("");
+
+      // Close modal after Phase 3
+      if (phaseIndex === 2) {
+        handleCloseTransactionModal();
+      }
+    } catch (err) {
+      console.error('Error saving disbursement:', err);
+      const errorMessage = err.response?.data?.message || "Failed to save disbursement. Please try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      setTransactionError(errorMessage);
+    }
   };
 
 
@@ -359,7 +543,7 @@ const OfficerPortal = () => {
     }
   };
 
-  const handleSendQuery = () => {
+  const handleSendQuery = async () => {
     const errors = {};
 
     // Validation
@@ -375,20 +559,33 @@ const OfficerPortal = () => {
       return;
     }
 
-    // Log query data
-    console.log("Query submitted (demo)", {
-      caseId: queryCase?.id,
-      queryType,
-      message: queryMessage,
-      highPriority,
-      fileName: queryFile?.name || null,
-    });
+    try {
+      await grievanceAPI.addQuery(queryCase?._id, {
+        queryType,
+        message: queryMessage,
+        highPriority
+      });
 
-    // Close modal
-    handleCloseQueryModal();
+      // Close modal
+      handleCloseQueryModal();
 
-    // Optional: Show toast (you can add toast UI if needed)
-    alert("Query sent to applicant (demo).");
+      // Show success toast
+      toast({
+        title: "Query Sent",
+        description: "Your query has been sent to the applicant successfully.",
+        variant: "default"
+      });
+
+      // Refresh cases list
+      fetchCases();
+    } catch (err) {
+      console.error('Error sending query:', err);
+      toast({
+        title: "Error",
+        description: "Failed to send query. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Handler for marking query as resolved
@@ -464,6 +661,134 @@ const OfficerPortal = () => {
     handleCloseGrievanceModal();
   };
 
+  // ========== SUPPORT TICKETS HANDLERS (API Connected) ==========
+
+  const fetchSupportTickets = async () => {
+    setTicketsLoading(true);
+    try {
+      const response = await ticketAPI.getAll();
+      setSupportTickets(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch support tickets:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load support tickets",
+        variant: "destructive"
+      });
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  const handleViewTicket = (ticket) => {
+    setSelectedTicket(ticket);
+    setTicketResponse("");
+    setShowTicketModal(true);
+  };
+
+  const handleCloseTicketModal = () => {
+    setShowTicketModal(false);
+    setSelectedTicket(null);
+    setTicketResponse("");
+  };
+
+  const handleSendTicketResponse = async () => {
+    if (!ticketResponse.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a response message",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTicketResponseLoading(true);
+    try {
+      await ticketAPI.respond(selectedTicket._id, ticketResponse.trim());
+      toast({
+        title: "Response Sent",
+        description: "Your response has been sent to the user",
+      });
+      // Refresh tickets and close modal
+      fetchSupportTickets();
+      handleCloseTicketModal();
+    } catch (error) {
+      console.error("Failed to send response:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send response. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setTicketResponseLoading(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId, newStatus) => {
+    try {
+      await ticketAPI.updateStatus(ticketId, newStatus);
+      toast({
+        title: "Status Updated",
+        description: `Ticket status changed to ${newStatus}`,
+      });
+      fetchSupportTickets();
+      if (selectedTicket && selectedTicket._id === ticketId) {
+        setSelectedTicket({ ...selectedTicket, status: newStatus });
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update ticket status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getTicketStatusBadge = (status) => {
+    const statusConfig = {
+      open: { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Open" },
+      under_review: { color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", label: "Under Review" },
+      resolved: { color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Resolved" },
+      closed: { color: "bg-gray-500/20 text-gray-400 border-gray-500/30", label: "Closed" }
+    };
+    const config = statusConfig[status] || statusConfig.open;
+    return <Badge className={`${config.color} border`}>{config.label}</Badge>;
+  };
+
+  const getCategoryLabel = (category) => {
+    const categories = {
+      delay: "Delay in Processing",
+      verification: "Verification Issues",
+      disbursement: "Disbursement Problems",
+      technical: "Technical Support",
+      document: "Document Related",
+      other: "Other"
+    };
+    return categories[category] || category;
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Filter support tickets based on search
+  const filteredSupportTickets = supportTickets.filter(ticket => {
+    if (!ticketSearchQuery.trim()) return true;
+    const query = ticketSearchQuery.toLowerCase();
+    return (
+      (ticket.ticketId || "").toLowerCase().includes(query) ||
+      (ticket.caseId || "").toLowerCase().includes(query) ||
+      (ticket.subject || "").toLowerCase().includes(query) ||
+      (ticket.userId?.name || "").toLowerCase().includes(query)
+    );
+  });
+
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -526,7 +851,7 @@ const OfficerPortal = () => {
         <section className="py-12">
           <div className="container mx-auto px-4">
             <Tabs defaultValue="cases" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-8">
+              <TabsList className="grid w-full grid-cols-5 mb-8">
                 <TabsTrigger value="cases">
                   <FileCheck className="h-4 w-4 mr-2" />
                   Case Review
@@ -543,6 +868,10 @@ const OfficerPortal = () => {
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Grievances
                 </TabsTrigger>
+                <TabsTrigger value="tickets" onClick={() => fetchSupportTickets()}>
+                  <Ticket className="h-4 w-4 mr-2" />
+                  Support Tickets
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="cases">
@@ -558,82 +887,160 @@ const OfficerPortal = () => {
                       <div className="flex-1 relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Search by Case ID, Aadhaar, or Victim Name..."
+                          placeholder="Search by Case ID, FIR Number, District, or State..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="pl-9"
                         />
                       </div>
-                      <Button variant="outline">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Filter
-                      </Button>
-                      <Button variant="outline">
+                      <Button variant="outline" onClick={handleExport}>
                         <Download className="h-4 w-4 mr-2" />
                         Export
                       </Button>
                     </div>
-
-                    {/* Cases List */}
-                    <div className="space-y-4">
-                      {mockCases.map((caseItem) => (
-                        <Card key={caseItem.id} className="border-l-4 border-l-primary">
-                          <CardContent className="pt-6">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h3 className="text-lg font-semibold">{caseItem.id}</h3>
-                                  {getStatusBadge(caseItem.status)}
-                                  {getPriorityBadge(caseItem.priority)}
-                                </div>
-
-                                <div className="grid md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    <span>{caseItem.victimName}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    <span>{caseItem.caseType}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Shield className="h-4 w-4" />
-                                    <span>{caseItem.district}, {caseItem.state}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <IndianRupee className="h-4 w-4" />
-                                    <span>₹{caseItem.amount}</span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <Brain className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-medium">AI Verification Score: {caseItem.aiScore}%</span>
-                                  </div>
-                                  <Progress value={caseItem.aiScore} className="h-2" />
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col gap-2 min-w-[160px]">
-                                <Button size="sm" onClick={() => handleViewDetails(caseItem)}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => handleRaiseQuery(caseItem)}>
-                                  <MessageSquare className="h-4 w-4 mr-2" />
-                                  Raise Query
-                                </Button>
-                                <Button size="sm" variant="default" onClick={() => handleOpenTransactionModal(caseItem)}>
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Approve
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                    {/* Status Filter Tabs */}
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "all" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("all")}
+                      >
+                        All Cases
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "pending" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("pending")}
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        Pending
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "under_review" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("under_review")}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Under Review
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "approved" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("approved")}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approved
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "rejected" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("rejected")}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Rejected
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "disbursed" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("disbursed")}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Disbursed
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={statusFilter === "closed" ? "default" : "outline"}
+                        onClick={() => setStatusFilter("closed")}
+                      >
+                        <Verified className="h-4 w-4 mr-2" />
+                        Closed
+                      </Button>
                     </div>
+
+
+                    {/* Loading State */}
+                    {loading && (
+                      <div className="text-center py-12">
+                        <p className="text-muted-foreground">Loading cases...</p>
+                      </div>
+                    )}
+
+                    {/* Error State */}
+                    {error && (
+                      <div className="text-center py-12">
+                        <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
+                        <p className="text-red-600">{error}</p>
+                        <Button onClick={fetchCases} className="mt-4">Retry</Button>
+                      </div>
+                    )}
+
+                    {/* Cases List - Scrollable Container */}
+                    {!loading && !error && (
+                      <div
+                        className="space-y-4 overflow-y-auto pr-2"
+                        style={{ maxHeight: "70vh" }}
+                      >
+                        {filteredCases.length === 0 ? (
+                          <div className="text-center py-12">
+                            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+                            <p className="text-muted-foreground">No cases found</p>
+                          </div>
+                        ) : (
+                          filteredCases.map((caseItem) => (
+                            <Card key={caseItem._id} className="border-l-4 border-l-primary">
+                              <CardContent className="pt-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <h3 className="text-lg font-semibold">{caseItem.caseId || caseItem._id}</h3>
+                                      <Badge variant="outline">{caseItem.status}</Badge>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                                      <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        <span>FIR: {caseItem.firCaseNumber}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Shield className="h-4 w-4" />
+                                        <span>{caseItem.district}, {caseItem.state}</span>
+                                      </div>
+                                      {caseItem.submittedAt && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="h-4 w-4" />
+                                          <span>Submitted: {new Date(caseItem.submittedAt).toLocaleDateString()}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col gap-2 min-w-[160px]">
+                                    <Button size="sm" onClick={() => handleViewDetails(caseItem)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Details
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleRaiseQuery(caseItem)}>
+                                      <MessageSquare className="h-4 w-4 mr-2" />
+                                      Raise Query
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleOpenTransactionModal(caseItem)}
+                                      disabled={caseItem.status !== 'approved'}
+                                      title={caseItem.status !== 'approved' ? 'Case must be approved first' : 'Enter transaction IDs'}
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-2" />
+                                      Approve
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -905,6 +1312,86 @@ const OfficerPortal = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* Support Tickets Tab Content */}
+              <TabsContent value="tickets">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Support Tickets – Review & Respond</CardTitle>
+                    <CardDescription>
+                      Manage complaints and support requests submitted by victims
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-4 mb-6">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by Ticket ID, Case ID, or Subject..."
+                          className="pl-10"
+                          value={ticketSearchQuery}
+                          onChange={(e) => setTicketSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <Button variant="outline" onClick={fetchSupportTickets}>
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {ticketsLoading ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        Loading tickets...
+                      </div>
+                    ) : filteredSupportTickets.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Ticket className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No support tickets found</p>
+                        <p className="text-sm">Click "Refresh" to load tickets</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-muted/50 text-muted-foreground font-medium">
+                            <tr>
+                              <th className="p-4">Ticket ID</th>
+                              <th className="p-4">Case ID</th>
+                              <th className="p-4">Submitted By</th>
+                              <th className="p-4">Category</th>
+                              <th className="p-4">Subject</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4">Created</th>
+                              <th className="p-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredSupportTickets.map((ticket) => (
+                              <tr key={ticket._id} className="border-t hover:bg-muted/50">
+                                <td className="p-4 font-medium text-accent">{ticket.ticketId}</td>
+                                <td className="p-4 text-muted-foreground">{ticket.caseId}</td>
+                                <td className="p-4">{ticket.userId?.name || "Unknown"}</td>
+                                <td className="p-4">
+                                  <Badge variant="outline" className="font-normal">
+                                    {getCategoryLabel(ticket.category)}
+                                  </Badge>
+                                </td>
+                                <td className="p-4 max-w-[200px] truncate">{ticket.subject}</td>
+                                <td className="p-4">{getTicketStatusBadge(ticket.status)}</td>
+                                <td className="p-4 text-muted-foreground">{formatDate(ticket.createdAt)}</td>
+                                <td className="p-4 text-right">
+                                  <Button size="sm" variant="outline" onClick={() => handleViewTicket(ticket)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
         </section>
@@ -914,93 +1401,146 @@ const OfficerPortal = () => {
 
       {/* View Details Modal */}
       {showDetailsModal && selectedCase && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseModal}>
-          <div
-            className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="p-6 border-b bg-gradient-to-r from-primary/5 to-secondary/5">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{selectedCase.id}</h2>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(selectedCase.status)}
-                    {getPriorityBadge(selectedCase.priority)}
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={handleCloseModal}>
-                  <AlertCircle className="h-5 w-5" />
-                </Button>
+            <div className="sticky top-0 z-10 bg-background border-b p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Eye className="h-6 w-6 text-primary" />
+                  Case Details: {selectedCase.caseId || selectedCase._id}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  FIR: {selectedCase.firCaseNumber || "N/A"}
+                </p>
               </div>
-
-              <div className="mt-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Brain className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">AI Verification Score: {selectedCase.aiScore}%</span>
-                </div>
-                <Progress value={selectedCase.aiScore} className="h-2" />
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCloseModal}
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
 
-            {/* Modal Content - Scrollable */}
-            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
-              {/* Victim Summary */}
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-6 space-y-6" style={{ maxHeight: "calc(90vh - 200px)" }}>
+              {/* Case Information */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Case Information
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">District</p>
+                    <p className="font-medium">{selectedCase.district || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">State</p>
+                    <p className="font-medium">{selectedCase.state || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Police Station</p>
+                    <p className="font-medium">{selectedCase.policeStation || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Status</p>
+                    <p className="font-medium capitalize">{selectedCase.status || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Submitted Date</p>
+                    <p className="font-medium">
+                      {selectedCase.submittedAt
+                        ? new Date(selectedCase.submittedAt).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Personal Information */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
-                  Victim Summary
+                  Personal Information
                 </h3>
-                <div className="grid md:grid-cols-2 gap-4 bg-muted/30 rounded-lg p-4">
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-sm text-muted-foreground">Applicant Name</p>
-                    <p className="font-medium">{selectedCase.victimName}</p>
+                    <p className="text-muted-foreground">Aadhaar Number</p>
+                    <p className="font-medium">{selectedCase.aadhaarNumber || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Location</p>
-                    <p className="font-medium">{selectedCase.district}, {selectedCase.state}</p>
+                    <p className="text-muted-foreground">Mobile Number</p>
+                    <p className="font-medium">{selectedCase.mobileNumber || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Type of Atrocity</p>
-                    <p className="font-medium">{selectedCase.caseType}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date of Incident</p>
-                    <p className="font-medium">{selectedCase.incidentDate}</p>
+                    <p className="text-muted-foreground">Email</p>
+                    <p className="font-medium">{selectedCase.email || "N/A"}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Case & FIR Details */}
+              {/* Incident Details */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  Case & FIR Details
+                  <AlertCircle className="h-5 w-5 text-primary" />
+                  Incident Details
                 </h3>
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">FIR / Case Number</p>
-                      <p className="font-medium">{selectedCase.firNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Police Station</p>
-                      <p className="font-medium">{selectedCase.policeStation}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Date of FIR</p>
-                      <p className="font-medium">{selectedCase.firDate}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Sections (IPC/PoA)</p>
-                      <p className="font-medium text-sm">{selectedCase.sections}</p>
-                    </div>
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Type of Atrocity</p>
+                    <p className="font-medium">{selectedCase.typeOfAtrocity || "N/A"}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2">Incident Description</p>
-                    <p className="text-sm leading-relaxed bg-muted/30 rounded-lg p-4">
-                      {selectedCase.incidentDescription}
+                    <p className="text-muted-foreground">Date of Incident</p>
+                    <p className="font-medium">
+                      {selectedCase.dateOfIncident
+                        ? new Date(selectedCase.dateOfIncident).toLocaleDateString()
+                        : "N/A"}
                     </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Date of FIR Registration</p>
+                    <p className="font-medium">
+                      {selectedCase.dateOfFirRegistration
+                        ? new Date(selectedCase.dateOfFirRegistration).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                  </div>
+                </div>
+                {selectedCase.incidentDescription && (
+                  <div className="mt-4">
+                    <p className="text-muted-foreground text-sm mb-2">Incident Description</p>
+                    <div className="bg-muted/30 rounded-lg p-4">
+                      <p className="text-sm whitespace-pre-wrap">{selectedCase.incidentDescription}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bank Details */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Bank Details for Disbursement
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4 text-sm bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div>
+                    <p className="text-muted-foreground">Account Holder Name</p>
+                    <p className="font-semibold">{selectedCase.accountHolderName || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Account Number</p>
+                    <p className="font-semibold font-mono">{selectedCase.accountNumber || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">IFSC Code</p>
+                    <p className="font-semibold font-mono">{selectedCase.ifscCode || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Bank Name</p>
+                    <p className="font-semibold">{selectedCase.bankName || "N/A"}</p>
                   </div>
                 </div>
               </div>
@@ -1011,27 +1551,7 @@ const OfficerPortal = () => {
                   <FileCheck className="h-5 w-5 text-primary" />
                   Submitted Documents
                 </h3>
-                <div className="space-y-3">
-                  {selectedCase.documents.map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium text-sm">{doc.type}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{doc.status.replace('_', ' ')}</p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => console.log("Open document:", doc.type)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <DocumentViewer grievanceId={selectedCase._id} />
               </div>
 
               {/* Officer Queries & Victim Responses */}
@@ -1043,7 +1563,11 @@ const OfficerPortal = () => {
 
                 {/* Query Summary */}
                 <div className="mb-4">
-                  {officerQueriesForCase.filter(q => q.status !== "Resolved").length > 0 ? (
+                  {officerQueriesForCase.length === 0 ? (
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No queries have been raised for this case.
+                    </p>
+                  ) : officerQueriesForCase.filter(q => q.status !== "Resolved").length > 0 ? (
                     <p className="text-sm font-medium text-orange-600">
                       Queries pending: {officerQueriesForCase.filter(q => q.status !== "Resolved").length}
                     </p>
@@ -1056,7 +1580,7 @@ const OfficerPortal = () => {
 
                 {/* Queries List */}
                 <div className="space-y-4">
-                  {officerQueriesForCase.map((query) => (
+                  {officerQueriesForCase.length > 0 && officerQueriesForCase.map((query) => (
                     <div key={query.id} className="border rounded-lg p-4 bg-muted/20 space-y-3">
                       {/* Query Header */}
                       <div className="flex items-start justify-between gap-3">
@@ -1120,35 +1644,7 @@ const OfficerPortal = () => {
                 </div>
               </div>
 
-              {/* Relief & DBT Information */}
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <IndianRupee className="h-5 w-5 text-primary" />
-                  Relief & DBT Information
-                </h3>
-                <div className="grid md:grid-cols-2 gap-4 bg-muted/30 rounded-lg p-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Proposed Relief Amount</p>
-                    <p className="font-bold text-lg text-primary">₹{selectedCase.amount}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Category</p>
-                    <p className="font-medium">{selectedCase.reliefCategory}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Bank Account</p>
-                    <p className="font-medium">{selectedCase.bankMasked}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">IFSC Code</p>
-                    <p className="font-medium">{selectedCase.ifsc}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm text-muted-foreground">Bank Name</p>
-                    <p className="font-medium">{selectedCase.bankName}</p>
-                  </div>
-                </div>
-              </div>
+
             </div>
 
             {/* Modal Footer - Action Buttons */}
@@ -1201,9 +1697,6 @@ const OfficerPortal = () => {
                     setQueryErrors({ ...queryErrors, queryType: "" });
                   }}
                 >
-                  <option value="">Select query type</option>
-                  <option value="missing_document">Missing document</option>
-                  <option value="clarification">Clarification on incident</option>
                   <option value="">Select query type...</option>
                   <option value="Missing Document">Missing Document</option>
                   <option value="Clarification Required">Clarification Required</option>
@@ -1449,52 +1942,312 @@ const OfficerPortal = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">Case ID</p>
-                      <p className="font-semibold">{disbursementCase.id}</p>
+                      <p className="font-semibold">{disbursementCase.caseId || disbursementCase._id || "N/A"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Applicant Name</p>
-                      <p className="font-semibold">{disbursementCase.victimName}</p>
+                      <p className="text-xs text-muted-foreground">FIR Number</p>
+                      <p className="font-semibold">{disbursementCase.firCaseNumber || "N/A"}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">Location</p>
-                      <p className="font-semibold">{disbursementCase.district}, {disbursementCase.state}</p>
+                      <p className="font-semibold">{disbursementCase.district || "N/A"}, {disbursementCase.state || "N/A"}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Relief Amount</p>
-                      <p className="font-bold text-lg text-primary">₹{disbursementCase.amount}</p>
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <p className="font-semibold capitalize">{disbursementCase.status || "N/A"}</p>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Bank Account (masked)</p>
-                    <p className="font-semibold">{disbursementCase.bankMasked}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Transaction ID Input */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold mb-2">Bank Transaction / UTR ID</h3>
-                <label htmlFor="transaction-id" className="text-sm font-medium">
-                  Enter Bank Transaction / UTR ID <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  id="transaction-id"
-                  type="text"
-                  placeholder="e.g. TXN1234567890"
-                  value={transactionId}
-                  onChange={(e) => {
-                    setTransactionId(e.target.value);
-                    setTransactionError("");
-                  }}
-                  className={transactionError ? "border-red-500" : ""}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter the exact Transaction/UTR ID from the government bank transfer to the beneficiary's account.
-                </p>
+              {/* Phased Disbursement Section */}
+              <div className="space-y-4">
+                <div className="border-l-4 border-l-primary pl-3">
+                  <h3 className="text-lg font-bold mb-1">Phased Disbursement</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Enter transaction IDs one phase at a time. Each phase must be verified by the victim before adding the next.
+                  </p>
+                </div>
+
+                {/* Phase 1 - 25% */}
+                {(() => {
+                  const phase1 = disbursementCase?.disbursements?.[0];
+                  const phase1Saved = !!phase1?.transactionId;
+                  const phase1Verified = !!phase1?.victimVerified;
+
+                  return (
+                    <div className={`space-y-2 p-4 rounded-lg border ${phase1Verified
+                      ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-700'
+                      : phase1Saved
+                        ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700'
+                        : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
+                      }`}>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-semibold">
+                          Phase 1 - First Installment (25%)
+                        </label>
+                        {phase1Verified && (
+                          <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                            <CheckCircle className="h-4 w-4" /> Verified
+                          </span>
+                        )}
+                        {phase1Saved && !phase1Verified && (
+                          <span className="flex items-center gap-1 text-yellow-600 text-sm font-medium">
+                            <Clock className="h-4 w-4" /> Waiting for verification
+                          </span>
+                        )}
+                      </div>
+
+                      {phase1Verified ? (
+                        <div className="bg-green-100 dark:bg-green-900/30 rounded p-3">
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            ✓ Transaction ID: <span className="font-mono">{phase1.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Verified on {phase1.victimVerifiedAt ? new Date(phase1.victimVerifiedAt).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      ) : phase1Saved ? (
+                        <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded p-3">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            Transaction ID saved: <span className="font-mono">{phase1.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            ⏳ Waiting for victim to verify this transaction
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            id="transaction-id-1"
+                            type="text"
+                            placeholder="Enter Transaction/UTR ID for 25%"
+                            value={transactionId1}
+                            onChange={(e) => {
+                              setTransactionId1(e.target.value);
+                              setTransactionError("");
+                            }}
+                            className="bg-white dark:bg-background flex-1"
+                          />
+                          <Button
+                            onClick={() => handleSaveSingleDisbursement(0, transactionId1)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={!transactionId1.trim()}
+                          >
+                            Save Phase 1
+                          </Button>
+                        </div>
+                      )}
+
+                      {!phase1Saved && (
+                        <p className="text-xs text-muted-foreground">
+                          First Installment (25%) - Save this first, then wait for victim verification.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Phase 2 - 25% */}
+                {(() => {
+                  const phase1 = disbursementCase?.disbursements?.[0];
+                  const phase1Verified = !!phase1?.victimVerified;
+                  const phase2 = disbursementCase?.disbursements?.[1];
+                  const phase2Saved = !!phase2?.transactionId;
+                  const phase2Verified = !!phase2?.victimVerified;
+
+                  // Phase 2 is locked until Phase 1 is verified
+                  if (!phase1Verified) {
+                    return (
+                      <div className="space-y-2 bg-gray-100 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-300 dark:border-gray-600 opacity-60">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-semibold text-gray-500">
+                            Phase 2 - Second Installment (25%)
+                          </label>
+                          <span className="text-xs text-gray-500">🔒 Locked</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Unlock by verifying Phase 1 first (victim must verify)
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className={`space-y-2 p-4 rounded-lg border ${phase2Verified
+                      ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-700'
+                      : phase2Saved
+                        ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700'
+                        : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                      }`}>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-semibold">
+                          Phase 2 - Second Installment (25%)
+                        </label>
+                        {phase2Verified && (
+                          <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                            <CheckCircle className="h-4 w-4" /> Verified
+                          </span>
+                        )}
+                        {phase2Saved && !phase2Verified && (
+                          <span className="flex items-center gap-1 text-yellow-600 text-sm font-medium">
+                            <Clock className="h-4 w-4" /> Waiting for verification
+                          </span>
+                        )}
+                      </div>
+
+                      {phase2Verified ? (
+                        <div className="bg-green-100 dark:bg-green-900/30 rounded p-3">
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            ✓ Transaction ID: <span className="font-mono">{phase2.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Verified on {phase2.victimVerifiedAt ? new Date(phase2.victimVerifiedAt).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      ) : phase2Saved ? (
+                        <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded p-3">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            Transaction ID saved: <span className="font-mono">{phase2.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            ⏳ Waiting for victim to verify this transaction
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            id="transaction-id-2"
+                            type="text"
+                            placeholder="Enter Transaction/UTR ID for 25%"
+                            value={transactionId2}
+                            onChange={(e) => {
+                              setTransactionId2(e.target.value);
+                              setTransactionError("");
+                            }}
+                            className="bg-white dark:bg-background flex-1"
+                          />
+                          <Button
+                            onClick={() => handleSaveSingleDisbursement(1, transactionId2)}
+                            className="bg-green-600 hover:bg-green-700"
+                            disabled={!transactionId2.trim()}
+                          >
+                            Save Phase 2
+                          </Button>
+                        </div>
+                      )}
+
+                      {!phase2Saved && (
+                        <p className="text-xs text-muted-foreground">
+                          Second Installment (25%) - Enter transaction ID, then wait for victim verification.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Phase 3 - 50% */}
+                {(() => {
+                  const phase2 = disbursementCase?.disbursements?.[1];
+                  const phase2Verified = !!phase2?.victimVerified;
+                  const phase3 = disbursementCase?.disbursements?.[2];
+                  const phase3Saved = !!phase3?.transactionId;
+                  const phase3Verified = !!phase3?.victimVerified;
+
+                  // Phase 3 is locked until Phase 2 is verified
+                  if (!phase2Verified) {
+                    return (
+                      <div className="space-y-2 bg-gray-100 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-300 dark:border-gray-600 opacity-60">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-semibold text-gray-500">
+                            Phase 3 - Final Installment (50%)
+                          </label>
+                          <span className="text-xs text-gray-500">🔒 Locked</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Unlock by verifying Phase 2 first (victim must verify)
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className={`space-y-2 p-4 rounded-lg border ${phase3Verified
+                      ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-700'
+                      : phase3Saved
+                        ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700'
+                        : 'bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800'
+                      }`}>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-semibold">
+                          Phase 3 - Final Installment (50%)
+                        </label>
+                        {phase3Verified && (
+                          <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                            <CheckCircle className="h-4 w-4" /> Verified
+                          </span>
+                        )}
+                        {phase3Saved && !phase3Verified && (
+                          <span className="flex items-center gap-1 text-yellow-600 text-sm font-medium">
+                            <Clock className="h-4 w-4" /> Waiting for verification
+                          </span>
+                        )}
+                      </div>
+
+                      {phase3Verified ? (
+                        <div className="bg-green-100 dark:bg-green-900/30 rounded p-3">
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            ✓ Transaction ID: <span className="font-mono">{phase3.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Verified on {phase3.victimVerifiedAt ? new Date(phase3.victimVerifiedAt).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      ) : phase3Saved ? (
+                        <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded p-3">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            Transaction ID saved: <span className="font-mono">{phase3.transactionId}</span>
+                          </p>
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            ⏳ Waiting for victim to verify this transaction
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            id="transaction-id-3"
+                            type="text"
+                            placeholder="Enter Transaction/UTR ID for 50%"
+                            value={transactionId3}
+                            onChange={(e) => {
+                              setTransactionId3(e.target.value);
+                              setTransactionError("");
+                            }}
+                            className="bg-white dark:bg-background flex-1"
+                          />
+                          <Button
+                            onClick={() => handleSaveSingleDisbursement(2, transactionId3)}
+                            className="bg-purple-600 hover:bg-purple-700"
+                            disabled={!transactionId3.trim()}
+                          >
+                            Save Phase 3
+                          </Button>
+                        </div>
+                      )}
+
+                      {!phase3Saved && (
+                        <p className="text-xs text-muted-foreground">
+                          Final Installment (50%) - Enter transaction ID, then wait for victim verification.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {transactionError && (
-                  <p className="text-xs text-red-500">{transactionError}</p>
+                  <p className="text-sm text-red-500 font-medium">{transactionError}</p>
                 )}
               </div>
             </div>
@@ -1502,11 +2255,123 @@ const OfficerPortal = () => {
             {/* Modal Footer */}
             <div className="p-6 border-t bg-muted/20 flex justify-end gap-3">
               <Button variant="ghost" onClick={handleCloseTransactionModal}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Support Ticket View/Respond Modal */}
+      {showTicketModal && selectedTicket && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseTicketModal}>
+          <div
+            className="bg-background rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Ticket className="h-6 w-6 text-accent" />
+                  {selectedTicket.ticketId}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Case ID: {selectedTicket.caseId} • Submitted by: {selectedTicket.userId?.name || "Unknown"}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={handleCloseTicketModal}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)] space-y-6">
+              {/* Status and Category */}
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Status</p>
+                  <div className="flex items-center gap-2">
+                    {getTicketStatusBadge(selectedTicket.status)}
+                    <select
+                      className="text-sm border rounded px-2 py-1 bg-background"
+                      value={selectedTicket.status}
+                      onChange={(e) => handleUpdateTicketStatus(selectedTicket._id, e.target.value)}
+                    >
+                      <option value="open">Open</option>
+                      <option value="under_review">Under Review</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Category</p>
+                  <Badge variant="outline">{getCategoryLabel(selectedTicket.category)}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Created</p>
+                  <p className="font-medium">{formatDate(selectedTicket.createdAt)}</p>
+                </div>
+              </div>
+
+              {/* Subject and Description */}
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">{selectedTicket.subject}</h3>
+                <p className="text-muted-foreground whitespace-pre-wrap">{selectedTicket.description}</p>
+              </div>
+
+              {/* Previous Responses */}
+              {selectedTicket.responses && selectedTicket.responses.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">Response History</h3>
+                  <div className="space-y-3">
+                    {selectedTicket.responses.map((response, index) => (
+                      <div key={index} className="bg-accent/10 p-4 rounded-lg border border-accent/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="h-4 w-4 text-accent" />
+                          <span className="font-medium text-sm">
+                            {response.respondedBy?.name || "Officer"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            • {formatDate(response.respondedAt)}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{response.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Response */}
+              <div>
+                <h3 className="font-semibold mb-3">Add Response</h3>
+                <textarea
+                  className="w-full p-3 border rounded-lg bg-background min-h-[100px] resize-none"
+                  placeholder="Type your response to the user..."
+                  value={ticketResponse}
+                  onChange={(e) => setTicketResponse(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t bg-muted/20 flex justify-end gap-3">
+              <Button variant="ghost" onClick={handleCloseTicketModal}>
                 Cancel
               </Button>
-              <Button className="bg-primary hover:bg-primary-hover" onClick={handleSaveDisbursement}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Save & Mark as Disbursed
+              <Button
+                className="bg-accent hover:bg-accent-hover"
+                onClick={handleSendTicketResponse}
+                disabled={ticketResponseLoading || !ticketResponse.trim()}
+              >
+                {ticketResponseLoading ? "Sending..." : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Response
+                  </>
+                )}
               </Button>
             </div>
           </div>

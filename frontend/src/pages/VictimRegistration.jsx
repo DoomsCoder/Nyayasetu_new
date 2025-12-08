@@ -56,12 +56,39 @@ const VictimRegistration = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (validateForm()) {
-            console.log(formData);
-            setSubmitted(true);
+            try {
+                // Call backend registration API
+                const response = await fetch('http://localhost:5000/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fullName: formData.fullName,
+                        email: formData.email,
+                        mobile: formData.mobile,
+                        password: formData.password,
+                        role: 'victim'
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    console.log('✅ Registration successful:', data.user);
+                    setSubmitted(true);
+                } else {
+                    console.error('❌ Registration failed:', data.message);
+                    alert(data.message || 'Registration failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('❌ Connection error:', error);
+                alert('Unable to connect to server. Please make sure the backend is running.');
+            }
         }
     };
 

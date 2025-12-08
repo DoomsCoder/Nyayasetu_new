@@ -25,22 +25,46 @@ const Login = () => {
     }
   }, [urlRole]);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    // Extract username from email (before @)
-    const userName = email.split("@")[0] || "User";
+    try {
+      // Call backend login API
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          expectedRole: selectedRole  // Send the role to validate against
+        }),
+      });
 
-    // Mock authentication - in production, this would make an API call
-    if (email && password) {
-      login(userName, selectedRole);
+      const data = await response.json();
 
-      // Redirect to intended destination or default portal
-      const intendedDestination = location.state?.from;
-      const defaultDestination = selectedRole === 'victim' ? '/victim-portal' : '/officer-portal';
+      if (response.ok && data.success) {
+        // Login successful
+        console.log('✅ Login successful:', data.user);
 
-      console.log(`🎯 Redirecting to: ${intendedDestination || defaultDestination}`);
-      navigate(intendedDestination || defaultDestination);
+        // Store token and call AuthContext login
+        login(data.token, data.user);
+
+        // Redirect to intended destination or default portal
+        const intendedDestination = location.state?.from;
+        const defaultDestination = data.user.role === 'victim' ? '/victim-portal' : '/officer-portal';
+
+        console.log(`🎯 Redirecting to: ${intendedDestination || defaultDestination}`);
+        navigate(intendedDestination || defaultDestination);
+      } else {
+        // Login failed
+        console.error('❌ Login failed:', data.message);
+        alert(data.message || 'Invalid email or password');
+      }
+    } catch (error) {
+      console.error('❌ Connection error:', error);
+      alert('Unable to connect to server. Please make sure the backend is running.');
     }
   };
 

@@ -1,0 +1,262 @@
+.document-upload-container {
+    padding: 30px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-width: 700px;
+    margin: 20px auto;
+}
+
+.document-upload-container h3 {
+    color: #1f2937;
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+.upload-instruction {
+    color: #6b7280;
+    margin-bottom: 25px;
+    font-size: 14px;
+}
+
+/* Uploaded Documents Status */
+.uploaded-docs-status {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.uploaded-docs-status h4 {
+    color: #166534;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+}
+
+.uploaded-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.uploaded-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+}
+
+.uploaded-item .doc-icon {
+    font-size: 24px;
+}
+
+.uploaded-item .doc-name {
+    flex: 1;
+    color: #374151;
+    font-weight: 500;
+}
+
+.uploaded-item .doc-size {
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.uploaded-item .check-mark {
+    color: #16a34a;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* Upload Form */
+.upload-form {
+    background: #f9fafb;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #374151;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-group select,
+.file-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.form-group select:focus,
+.file-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.form-group select:disabled,
+.file-input:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
+}
+
+.file-input {
+    cursor: pointer;
+}
+
+.selected-file {
+    margin-top: 10px;
+    padding: 12px;
+    background: #eff6ff;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.selected-file span:first-child {
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.file-size {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+/* Error Message */
+.error-message {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #fecaca;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+/* Upload Progress */
+.upload-progress {
+    margin-bottom: 20px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.upload-progress p {
+    text-align: center;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+/* Upload Button */
+.upload-button {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.upload-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.upload-button:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* All Uploaded */
+.all-uploaded {
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.all-uploaded p {
+    color: #166534;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Info Box */
+.info-box {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 20px;
+    border-radius: 6px;
+}
+
+.info-box h4 {
+    color: #1e40af;
+    margin: 0 0 12px 0;
+    font-size: 15px;
+}
+
+.info-box ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #475569;
+}
+
+.info-box li {
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .document-upload-container {
+        padding: 20px;
+        margin: 10px;
+    }
+
+    .upload-form {
+        padding: 15px;
+    }
+
+    .selected-file {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}

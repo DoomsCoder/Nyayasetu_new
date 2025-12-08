@@ -17,9 +17,11 @@ import Grievances from "./pages/Grievances";
 import VictimPortal from "./pages/VictimPortal";
 import OfficerPortal from "./pages/OfficerPortal";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import VictimRegistration from "./pages/VictimRegistration";
 import OfficerRegistration from "./pages/OfficerRegistration";
 import EmergencyFund from "./pages/EmergencyFund";
+import TrackGrievance from "./pages/TrackGrievance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,7 @@ const App = () => {
                 <Route path="/login/:role" element={<Login />} />
                 <Route path="/transparency" element={<Transparency />} />
                 <Route path="/grievances" element={<Grievances />} />
+                <Route path="/track-grievance" element={<TrackGrievance />} />
                 <Route
                   path="/victim-portal"
                   element={
@@ -59,6 +62,7 @@ const App = () => {
                   }
                 />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
                 <Route path="/register/victim" element={<VictimRegistration />} />
                 <Route path="/register/officer" element={<OfficerRegistration />} />
                 <Route path="/emergency-fund" element={<EmergencyFund />} />

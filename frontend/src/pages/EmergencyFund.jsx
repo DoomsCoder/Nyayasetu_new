@@ -27,9 +27,10 @@ const EmergencyFund = () => {
     const [fullName, setFullName] = useState("");
     const [dateOfBirth, setDateOfBirth] = useState("");
     const [mobile, setMobile] = useState("");
+    const [aadhaar, setAadhaar] = useState("");
+    const [pincode, setPincode] = useState("");
     const [email, setEmail] = useState("");
     const [address, setAddress] = useState("");
-    const [pincode, setPincode] = useState("");
     const [district, setDistrict] = useState("");
     const [state, setState] = useState("");
     const [incidentDate, setIncidentDate] = useState("");
@@ -86,9 +87,10 @@ const EmergencyFund = () => {
         setFullName("");
         setDateOfBirth("");
         setMobile("");
+        setAadhaar("");
+        setPincode("");
         setEmail("");
         setAddress("");
-        setPincode("");
         setDistrict("");
         setState("");
         setIncidentDate("");
@@ -113,7 +115,7 @@ const EmergencyFund = () => {
         e.preventDefault();
 
         // Validate all required fields
-        if (!fullName || !mobile || !district || !state || !incidentDate ||
+        if (!fullName || !mobile || !aadhaar || !district || !state || !incidentDate ||
             !bankAccountNumber || !ifscCode || !accountHolderName) {
             toast({
                 title: "Validation Error",
@@ -281,6 +283,30 @@ const EmergencyFund = () => {
                                             />
                                         </div>
 
+                                        <div className="space-y-2">
+                                            <Label htmlFor="aadhaar">Aadhaar Number *</Label>
+                                            <Input
+                                                id="aadhaar"
+                                                placeholder="XXXX XXXX XXXX"
+                                                maxLength={12}
+                                                value={aadhaar}
+                                                onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ''))}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pincode">Pincode *</Label>
+                                            <Input
+                                                id="pincode"
+                                                placeholder="6-digit PIN code"
+                                                maxLength={6}
+                                                value={pincode}
+                                                onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+                                                required
+                                            />
+                                        </div>
+
                                         <div className="space-y-2 md:col-span-2">
                                             <Label htmlFor="address">Address *</Label>
                                             <Input
@@ -289,17 +315,6 @@ const EmergencyFund = () => {
                                                 value={address}
                                                 onChange={(e) => setAddress(e.target.value)}
                                                 required
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2 md:col-span-2">
-                                            <Label htmlFor="pincode">Pincode *</Label>
-                                            <Input
-                                                id="pincode"
-                                                placeholder="6-digit PIN code"
-                                                maxLength={6}
-                                                value={pincode}
-                                                onChange={(e) => setPincode(e.target.value)}
                                             />
                                         </div>
                                     </div>
