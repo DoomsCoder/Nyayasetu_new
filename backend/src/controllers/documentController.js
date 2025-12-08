@@ -237,9 +237,10 @@ exports.downloadDocument = async (req, res) => {
         // Get file from local storage
         const fs = require('fs');
         const path = require('path');
-        const uploadsDir = path.join(__dirname, '../../uploads');
-        const folderPath = path.join(uploadsDir, document.googleDriveFolderId);
-        const filePath = path.join(folderPath, document.googleDriveFileId);
+
+        // googleDriveFolderId already contains the full folder path
+        // googleDriveFileId contains the unique filename
+        const filePath = path.join(document.googleDriveFolderId, document.googleDriveFileId);
 
         // Check if file exists
         if (!fs.existsSync(filePath)) {

@@ -851,7 +851,7 @@ const OfficerPortal = () => {
         <section className="py-12">
           <div className="container mx-auto px-4">
             <Tabs defaultValue="cases" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-8">
+              <TabsList className="grid w-full grid-cols-4 mb-8">
                 <TabsTrigger value="cases">
                   <FileCheck className="h-4 w-4 mr-2" />
                   Case Review
@@ -863,10 +863,6 @@ const OfficerPortal = () => {
                 <TabsTrigger value="analytics">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Analytics
-                </TabsTrigger>
-                <TabsTrigger value="grievances">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Grievances
                 </TabsTrigger>
                 <TabsTrigger value="tickets" onClick={() => fetchSupportTickets()}>
                   <Ticket className="h-4 w-4 mr-2" />
@@ -1228,86 +1224,6 @@ const OfficerPortal = () => {
                           <Progress value={dist.efficiency} className="h-2" />
                         </div>
                       ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Grievances Tab */}
-              <TabsContent value="grievances">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Grievance Desk – Review & Respond</CardTitle>
-                    <CardDescription>Manage grievances submitted by victims related to DBT and case processing</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-4 mb-6">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search by Grievance ID, Case ID, or Victim Name..."
-                          className="pl-10"
-                          value={grievanceSearchQuery}
-                          onChange={(e) => setGrievanceSearchQuery(e.target.value)}
-                        />
-                      </div>
-                      <Button variant="outline" onClick={() => console.log("Filter clicked (demo)")}>
-                        <Filter className="h-4 w-4 mr-2" />
-                        Filter
-                      </Button>
-                    </div>
-
-                    <div className="rounded-md border">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground font-medium">
-                          <tr>
-                            <th className="p-4">Grievance ID</th>
-                            <th className="p-4">Case ID</th>
-                            <th className="p-4">Victim Name</th>
-                            <th className="p-4">Category</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4">Created On</th>
-                            <th className="p-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {grievances
-                            .filter(g =>
-                              g.id.toLowerCase().includes(grievanceSearchQuery.toLowerCase()) ||
-                              g.caseId.toLowerCase().includes(grievanceSearchQuery.toLowerCase()) ||
-                              g.victimName.toLowerCase().includes(grievanceSearchQuery.toLowerCase())
-                            )
-                            .map((grievance) => (
-                              <tr key={grievance.id} className="border-t hover:bg-muted/50">
-                                <td className="p-4 font-medium">{grievance.id}</td>
-                                <td className="p-4 text-muted-foreground">{grievance.caseId}</td>
-                                <td className="p-4">{grievance.victimName}</td>
-                                <td className="p-4">
-                                  <Badge variant="outline" className="font-normal">
-                                    {grievance.category}
-                                  </Badge>
-                                </td>
-                                <td className="p-4">
-                                  <Badge className={
-                                    grievance.status === "Open" ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
-                                      grievance.status === "Under Review" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" :
-                                        grievance.status === "Resolved" ? "bg-green-100 text-green-800 hover:bg-green-100" :
-                                          "bg-red-100 text-red-800 hover:bg-red-100"
-                                  }>
-                                    {grievance.status}
-                                  </Badge>
-                                </td>
-                                <td className="p-4 text-muted-foreground">{grievance.createdOn}</td>
-                                <td className="p-4 text-right">
-                                  <Button size="sm" variant="outline" onClick={() => handleViewGrievance(grievance)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
                     </div>
                   </CardContent>
                 </Card>
