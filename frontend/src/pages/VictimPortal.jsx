@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SearchableAtrocitySelect from "@/components/SearchableAtrocitySelect";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -814,60 +815,11 @@ const VictimPortal = () => {
 
                         <div className="space-y-2">
                           <Label htmlFor="atrocity-type">Type of Atrocity / Offence *</Label>
-                          <select
-                            id="atrocity-type"
-                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                          <SearchableAtrocitySelect
+                            value={formData.typeOfAtrocity}
+                            onChange={(value) => setFormData(prev => ({ ...prev, typeOfAtrocity: value }))}
                             required
-                          >
-                            <option value="">Select type of atrocity</option>
-                            <option value="inedible-substance">Putting inedible or dirty/obnoxious substance on a person (कसी व्यक्त को खाने योग्य नहीं या गंदा पदार्थ जबरदस्ती देना / लगाना)</option>
-                            <option value="excreta-dumping">Throwing/dumping excreta, sewage, carcass on someone (किसी पर मल-मूत्र, गंदा पानी या पशु-मृत शरीर फेंकना)</option>
-                            <option value="intentional-dumping">Dumping such substances intentionally to insult or annoy (अपमान या परेशान करने की नीयत से गंदगी डालना)</option>
-                            <option value="footwear-garland">Garlanding with footwear, parading naked or half-naked (चप्पल की माला पहनाना, नग्न या अर्ध-नग्न घुमाना)</option>
-                            <option value="forced-humiliation">Forcing to remove clothes, shave head, moustache or paint body (कपड़े उतरवाना, सिर/मूंछ जबरन मुंडवाना, शरीर पर रंग लगाना)</option>
-                            <option value="land-occupation">Wrongful occupation or illegal cultivation on land (ज़मीन पर गैर-कानूनी कब्ज़ा या खेती करना)</option>
-                            <option value="land-dispossession">Wrongful dispossession from land or interfering with forest rights (किसी को उसकी ज़मीन/जंगल के अधिकार से बेदखल करना)</option>
-                            <option value="forced-labour">Forced labour / begar / bonded labour (बेगार करवाना, जबरन या बंधुआ मज़दूरी करवाना)</option>
-                            <option value="forced-dead-body">Forcing to dispose or carry human/animal dead bodies (मानव/पशु शव उठाने या निपटाने के लिए मजबूर करना)</option>
-                            <option value="manual-scavenging">Forcing to do manual scavenging or employing for it (जबरन मैला ढोना करवाना या इसके लिए नियुक्त करना)</option>
-                            <option value="devadasi">Dedicating an SC/ST woman as a devadasi (किसी एससी/एसटी महिला को देवदासी बनाना)</option>
-                            <option value="voting-prevention">Preventing from voting or filing nomination (मतदान या नामांकन करने से रोकना)</option>
-                            <option value="panchayat-threat">Stopping or threatening a Panchayat/Municipal office holder (पंचायत/नगरपालिका अधिकारी को काम करने से रोकना या धमकाना)</option>
-                            <option value="post-election-violence">Violence after elections or social/economic boycott (चुनाव के बाद हिंसा करना या सामाजिक/आर्थिक बहिष्कार करना)</option>
-                            <option value="voting-retaliation">Committing any offence because a person voted/did not vote (किसी ने वोट दिया या नहीं दिया — इस कारण अपराध करना)</option>
-                            <option value="false-cases">Filing false, malicious legal cases against SC/ST person (एससी/एसटी व्यक्ति पर झूठे या बदनीयत कानूनी मामले दर्ज करना)</option>
-                            <option value="false-information">Giving false information to a public servant (सरकारी अधिकारी को झूठी/गलत जानकारी देना)</option>
-                            <option value="public-insult">Intentional insult in public view (सार्वजनिक स्थान पर जानबूझकर अपमान करना)</option>
-                            <option value="caste-abuse">Abusing by caste name in public (सार्वजनिक स्थान पर जाति-सूचक गाली देना)</option>
-                            <option value="sacred-damage">Destroying/damaging sacred or respected objects (पवित्र या सम्मानित वस्तुओं को नुकसान पहुँचाना)</option>
-                            <option value="caste-hatred">Promoting caste-hatred or enmity (जातीय नफरत या वैमनस्य फैलाना)</option>
-                            <option value="dead-disrespect">Disrespecting respected dead person by words/acts (किसी दिवंगत सम्मानित व्यक्ति का अपमान करना)</option>
-                            <option value="sexual-touching">Sexual touching/gesture without consent of SC/ST woman (एससी/एसटी महिला को बिना सहमति यौन रूप से छूना या संकेत करना)</option>
-                            <option value="acid-attack">Throwing or attempt to throw acid (तेज़ाब फेंकना या फेंकने का प्रयास करना)</option>
-                            <option value="outraging-modesty">Outraging modesty of woman (महिला की मर्यादा भंग करना)</option>
-                            <option value="sexual-harassment">Sexual harassment (यौन उत्पीड़न)</option>
-                            <option value="disrobe-intent">Intent to disrobe a woman (महिला के कपड़े उतारने की नीयत से हमला करना)</option>
-                            <option value="voyeurism">Voyeurism (चोरी-छिपे देखना या वीडियो बनाना)</option>
-                            <option value="stalking">Stalking (पीछा करना या परेशान करना)</option>
-                            <option value="marital-rape-separation">Sexual intercourse by husband during separation (अलग रहने की अवधि में पति द्वारा जबरन शारीरिक संबंध बनाना)</option>
-                            <option value="authority-abuse">Sexual intercourse by person in authority (अधिकार में बैठे व्यक्ति द्वारा यौन शोषण)</option>
-                            <option value="modesty-insult">Insulting modesty of woman by word/gesture (महिला की मर्यादा का शब्द/इशारे से अपमान करना)</option>
-                            <option value="water-contamination">Fouling or contaminating water (पानी को गंदा या दूषित करना)</option>
-                            <option value="passage-denial">Denying right of passage to public place (सार्वजनिक मार्ग/रास्ते का उपयोग रोकना)</option>
-                            <option value="forced-eviction">Forcing a person to leave house/village (किसी व्यक्ति को घर या गांव छोड़ने के लिए मजबूर करना)</option>
-                            <option value="public-resource-denial">Preventing SC/ST person from using public resources (सार्वजनिक पानी, सड़क, मंदिर, वाहन, कपड़े आदि के उपयोग से रोकना)</option>
-                            <option value="witch-torture">Physical/mental torture by calling woman "witch" (महिला को "डायन/चुड़ैल" कहकर शारीरिक/मानसिक यातना देना)</option>
-                            <option value="social-boycott">Imposing or threatening social/economic boycott (सामाजिक या आर्थिक बहिष्कार करना/धमकाना)</option>
-                            <option value="false-evidence">Giving or fabricating false evidence (झूठे साक्ष्य देना या तैयार करना)</option>
-                            <option value="ipc-10-years">Committing IPC offences punishable with 10+ years (10 वर्ष या अधिक दंड वाली गंभीर IPC धाराओं का अपराध करना)</option>
-                            <option value="poa-ipc-schedule">Offences under IPC Schedule of PoA Act (PoA अधिनियम सूची में शामिल IPC अपराध करना)</option>
-                            <option value="public-servant-abuse">Victimization by a public servant (सरकारी कर्मचारी द्वारा प्रताड़ित करना)</option>
-                            <option value="disability-caused">Disability caused due to offence (अपराध के कारण विकलांगता होना)</option>
-                            <option value="rape-gang-rape">Rape / Gang-rape (बलात्कार / सामूहिक बलात्कार)</option>
-                            <option value="murder-death">Murder or death (हत्या या मृत्यु होना)</option>
-                            <option value="major-offence-relief">Additional relief for major offences (हत्या, बलात्कार जैसे गंभीर अपराधों पर अतिरिक्त सहायता)</option>
-                            <option value="house-destruction">Complete destruction or burning of house (घर का जलना या पूरी तरह नष्ट होना)</option>
-                          </select>
+                          />
                         </div>
 
                         <div className="space-y-2">
