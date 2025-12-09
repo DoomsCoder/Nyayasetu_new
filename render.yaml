@@ -1,0 +1,61 @@
+# Render Blueprint for NyayaSetu
+# This file enables one-click deployment of both frontend and backend
+# Documentation: https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API Service
+  - type: web
+    name: nyayasetu-backend
+    runtime: node
+    region: oregon # You can change to: frankfurt, ohio, singapore
+    plan: free # Options: free, starter, standard, pro
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false # User must set this manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true # Render will auto-generate a secure secret
+      - key: CORS_ORIGIN
+        fromService:
+          name: nyayasetu-frontend
+          type: web
+          property: url
+      - key: SENDGRID_API_KEY
+        sync: false # User must set this manually
+      - key: SENDGRID_FROM_EMAIL
+        sync: false # User must set this manually
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        sync: false # User must set this manually
+      - key: GOOGLE_CLOUD_CREDENTIALS
+        sync: false # User must set this manually (JSON string)
+
+  # Frontend Static Site
+  - type: web
+    name: nyayasetu-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=31536000
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: nyayasetu-backend
+          type: web
+          property: url
