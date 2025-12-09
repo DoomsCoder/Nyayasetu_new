@@ -7,8 +7,8 @@ services:
   - type: web
     name: nyayasetu-backend
     runtime: node
-    region: oregon # You can change to: frankfurt, ohio, singapore
-    plan: free # Options: free, starter, standard, pro
+    region: oregon
+    plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
@@ -19,43 +19,29 @@ services:
       - key: PORT
         value: 5000
       - key: MONGODB_URI
-        sync: false # User must set this manually in Render dashboard
+        sync: false
       - key: JWT_SECRET
-        generateValue: true # Render will auto-generate a secure secret
+        generateValue: true
       - key: CORS_ORIGIN
-        fromService:
-          name: nyayasetu-frontend
-          type: web
-          property: url
+        sync: false
       - key: SENDGRID_API_KEY
-        sync: false # User must set this manually
+        sync: false
       - key: SENDGRID_FROM_EMAIL
-        sync: false # User must set this manually
-      - key: GOOGLE_CLOUD_PROJECT_ID
-        sync: false # User must set this manually
-      - key: GOOGLE_CLOUD_CREDENTIALS
-        sync: false # User must set this manually (JSON string)
+        sync: false
 
   # Frontend Static Site
   - type: web
     name: nyayasetu-frontend
     runtime: static
-    region: oregon
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=31536000
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: nyayasetu-backend
-          type: web
-          property: url
+        sync: false
+
