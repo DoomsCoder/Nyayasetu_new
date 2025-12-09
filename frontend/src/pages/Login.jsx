@@ -31,22 +31,11 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      // Call backend login API
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          expectedRole: selectedRole  // Send the role to validate against
-        }),
-      });
+      // Call backend login API using centralized API service
+      const { authAPI } = await import('@/services/api');
+      const data = await authAPI.login(email, password);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         // Login successful
         console.log('✅ Login successful:', data.user);
 

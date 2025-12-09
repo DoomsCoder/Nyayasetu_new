@@ -14,8 +14,9 @@ export const AuthProvider = ({ children }) => {
 
             if (token) {
                 try {
-                    // Verify token with backend
-                    const response = await fetch('http://localhost:5000/api/auth/profile', {
+                    // Verify token with backend using environment variable
+                    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
                         headers: {
                             'Authorization': `Bearer ${token}`
                         }

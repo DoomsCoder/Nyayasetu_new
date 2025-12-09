@@ -64,27 +64,20 @@ const OfficerRegistration = () => {
 
         if (validateForm()) {
             try {
-                // Call backend registration API
-                const response = await fetch('http://localhost:5000/api/auth/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fullName: formData.fullName,
-                        email: formData.email,
-                        mobile: formData.mobile,
-                        password: formData.password,
-                        role: 'officer',
-                        district: formData.district,
-                        state: formData.state,
-                        officerId: formData.officerId
-                    }),
+                // Call backend registration API using centralized API service
+                const { authAPI } = await import('@/services/api');
+                const data = await authAPI.register({
+                    fullName: formData.fullName,
+                    email: formData.email,
+                    mobile: formData.mobile,
+                    password: formData.password,
+                    role: 'officer',
+                    district: formData.district,
+                    state: formData.state,
+                    officerId: formData.officerId
                 });
 
-                const data = await response.json();
-
-                if (response.ok && data.success) {
+                if (data.success) {
                     console.log('✅ Officer registration successful:', data.user);
                     setSubmitted(true);
                 } else {

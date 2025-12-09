@@ -61,24 +61,17 @@ const VictimRegistration = () => {
 
         if (validateForm()) {
             try {
-                // Call backend registration API
-                const response = await fetch('http://localhost:5000/api/auth/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fullName: formData.fullName,
-                        email: formData.email,
-                        mobile: formData.mobile,
-                        password: formData.password,
-                        role: 'victim'
-                    }),
+                // Call backend registration API using centralized API service
+                const { authAPI } = await import('@/services/api');
+                const data = await authAPI.register({
+                    fullName: formData.fullName,
+                    email: formData.email,
+                    mobile: formData.mobile,
+                    password: formData.password,
+                    role: 'victim'
                 });
 
-                const data = await response.json();
-
-                if (response.ok && data.success) {
+                if (data.success) {
                     console.log('✅ Registration successful:', data.user);
                     setSubmitted(true);
                 } else {
