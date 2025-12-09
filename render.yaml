@@ -30,10 +30,8 @@ services:
         sync: false
 
   # Frontend Static Site
-  - type: web
+  - type: static
     name: nyayasetu-frontend
-    runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
@@ -44,4 +42,5 @@ services:
     envVars:
       - key: VITE_API_URL
         sync: false
+
 
